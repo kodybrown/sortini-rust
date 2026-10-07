@@ -1,0 +1,27 @@
+[package]
+name = "sortini-rust"
+version = "4.0.0"
+edition = "2024"
+rust-version = "1.95"
+description = "Sort INI files while preserving comments, formatting, and encoding"
+license = "MIT"
+authors = ["Kody Brown"]
+repository = "https://github.com/kodybrown/sortini-rust"
+
+[lib]
+name = "sortini"
+
+[[bin]]
+name = "sortini"
+path = "src/main.rs"
+
+[dependencies]
+icu_collator = "2.2"
+rust_decimal = { version = "1.43", default-features = false, features = ["std"] }
+
+[dev-dependencies]
+tempfile = "3"
+
+[profile.release]
+lto = "thin"
+strip = true
