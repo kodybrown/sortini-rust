@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### 2026-10-07 - Direct develop workflow
+
+- Integrated the accepted check/reliability/Windows tooling commit `84fb8ed`
+  with a fast-forward and removed its disposable task worktree and branch.
+- Created `develop` from the integrated state and changed agent/development
+  instructions to always use the main project directory directly on `develop`,
+  replacing the task-worktree default. Promotion to `main` and pushes remain
+  explicit actions.
+- Preserved the reviewed Windows ZIP and checksum in
+  `target/release/distribution/accepted-84fb8ed/`, with matching SHA-256 hashes.
+- Verification: the full Cargo formatting, Clippy, Debug/Release test, and release
+  build gate passed in the main directory; Git whitespace and final branch/worktree
+  checks passed. The instruction change is documentation only.
+
 ### 2026-10-07 - Check mode, reliability, and Windows tooling
 
 - Added `--check` with exact byte comparison, nonmutating file/stdin processing,

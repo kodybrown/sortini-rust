@@ -5,11 +5,20 @@ edition 2024 and a committed `Cargo.lock`. Focus is Windows for now; CI runs on
 `windows-latest`. Build, test, benchmark, and packaging entry points are Cargo
 commands. Make is not used, and dotask is deferred until it stabilizes.
 
+## Checkout workflow
+
+Work directly in `C:\Users\kodyb\Projects\sortini-rust` on `develop`. Do not
+create disposable task worktrees or AI task branches for routine work. Check the
+directory, branch, and status before edits, preserve unrelated changes, and commit
+only scoped, verified work on `develop`. Promotion to `main` and pushes require
+an explicit request.
+
 ## Verification
 
-From the active checkout/worktree:
+From the main project directory on `develop`:
 
 ```powershell
+cd C:\Users\kodyb\Projects\sortini-rust
 cargo fmt --all --check
 cargo clippy --locked --all-targets -- -D warnings
 cargo test --locked

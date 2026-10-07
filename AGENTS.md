@@ -4,12 +4,15 @@
 
 - Project: `sortini-rust`; Rust library crate `sortini` and binary `sortini`.
 - Integration checkout: `C:\Users\kodyb\Projects\sortini-rust`.
-- Integration branch: `main`.
-- Behavioral work uses disposable task worktrees under `worktrees/ai/` and
-  branches named `codex/<short-name>`, based on `main`.
-- Keep follow-up work in the same task worktree. Commit only scoped, verified
-  work. Integrate and clean up only after explicit acceptance; never push
-  without an explicit request.
+- Development and integration branch: `develop`.
+- Always work directly in `C:\Users\kodyb\Projects\sortini-rust` on `develop`.
+  This project-specific workflow replaces the global task-worktree default.
+- Do not create disposable task worktrees or AI task branches for routine work.
+  Keep follow-up work in the same main project directory and on `develop`.
+- Before editing, verify the exact directory, active branch, and Git status.
+  Preserve unrelated changes; never stash or discard user work to change branches.
+- Commit only scoped, verified work on `develop`. Promote to `main`, manage other
+  branches/worktrees, or push only when explicitly requested.
 - The C# source is archived. Use the supplied reference executable
   `C:\Users\kodyb\Bin\sortini_cs.exe` for comparisons and benchmarks; do not
   modify or replace it. Preserve the copied golden fixtures.
@@ -52,5 +55,6 @@
 - Benchmark and package via `cargo run --release --example benchmark` and
   `cargo run --release --example package`; see `docs/development.md`. Package
   preparation is local only and does not install, publish, or modify PATH.
-- Handoff must include exact `cd`, verification, and run commands for the task
-  worktree, with committed versus integrated/pushed state made explicit.
+- Handoff must include exact `cd`, verification, and run commands for the main
+  project directory on `develop`, with committed versus promoted/pushed state
+  made explicit.
