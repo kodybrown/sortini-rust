@@ -10,11 +10,15 @@
   instructions to always use the main project directory directly on `develop`,
   replacing the task-worktree default. Promotion to `main` and pushes remain
   explicit actions.
+- Clarified that ordinary implementation, documentation, and read-only work
+  defaults to the main checkout on `develop`; worktrees require an explicit user
+  request and must not be inferred from behavioral changes, task size, or duration.
 - Preserved the reviewed Windows ZIP and checksum in
   `target/release/distribution/accepted-84fb8ed/`, with matching SHA-256 hashes.
 - Verification: the full Cargo formatting, Clippy, Debug/Release test, and release
   build gate passed in the main directory; Git whitespace and final branch/worktree
   checks passed. The instruction change is documentation only.
+  The follow-up policy clarification passed Git whitespace checks.
 
 ### 2026-10-07 - Check mode, reliability, and Windows tooling
 

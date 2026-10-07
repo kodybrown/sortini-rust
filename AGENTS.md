@@ -5,10 +5,12 @@
 - Project: `sortini-rust`; Rust library crate `sortini` and binary `sortini`.
 - Integration checkout: `C:\Users\kodyb\Projects\sortini-rust`.
 - Development and integration branch: `develop`.
-- Always work directly in `C:\Users\kodyb\Projects\sortini-rust` on `develop`.
-  This project-specific workflow replaces the global task-worktree default.
-- Do not create disposable task worktrees or AI task branches for routine work.
-  Keep follow-up work in the same main project directory and on `develop`.
+- Ordinary work defaults to the main checkout on `develop`; worktrees require
+  an explicit request from the user. This includes implementation, documentation,
+  and read-only work in `C:\Users\kodyb\Projects\sortini-rust`.
+- Do not create a worktree or AI feature branch based on behavioral changes,
+  task size, or duration. Keep ordinary follow-up work in the main checkout on
+  `develop`.
 - Before editing, verify the exact directory, active branch, and Git status.
   Preserve unrelated changes; never stash or discard user work to change branches.
 - Commit only scoped, verified work on `develop`. Promote to `main`, manage other
