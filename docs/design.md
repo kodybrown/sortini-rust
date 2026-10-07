@@ -24,6 +24,12 @@ Explicit normalization reconstructs headers and entries, removes existing blank
 lines, and generates requested section spacing using the detected or overridden
 EOL. It retains comments and unrecognized lines.
 
+Raw sorting can place an LF blank line after a CR-ending entry. Those two endings
+would merge into one CRLF and erase a physical blank line. Export widens that
+specific boundary's CR to CRLF, retaining the blank line's own LF. Other physical
+endings remain unchanged. A fixed regression and persisted property-test seed
+cover this correction.
+
 ## Comparison
 
 [ICU4X root collation](https://docs.rs/icu_collator/2.2.1/icu_collator/struct.Collator.html)
@@ -34,10 +40,14 @@ or lowercasing. Collators are created once per document sort, not per comparison
 
 [Exact decimal arithmetic](https://docs.rs/rust_decimal/1.43.0/rust_decimal/struct.Decimal.html)
 handles whole numbers and trailing decimal suffixes without floating-point
-precision loss. Natural comparison first checks whole-string numbers, then
-matching text prefixes with numeric suffixes. C# retains a minus sign in the
-suffix's prefix; this implementation does too. Numeric parsing uses deterministic
-dot decimals and comma grouping rather than the process locale.
+precision loss. Natural comparison derives a `(prefix, optional decimal)` key
+for each label before comparing. Complete numbers use an empty prefix; suffix
+numbers retain their prefix, including a minus sign as in C#; other labels use
+their full text. Prefixes compare by collation, then optional numbers compare
+exactly. An absent number precedes a present number for equal prefixes. This
+defines a consistent order instead of the legacy pair-dependent fallback, which
+can create comparison cycles. Numeric parsing uses deterministic dot decimals
+and comma grouping rather than the process locale.
 
 ## Encoding and persistence
 
@@ -57,3 +67,9 @@ can leave a partial destination requiring recovery from the backup.
 Stdin is read directly into memory, avoiding the C# temporary-file lifecycle.
 Multiple file failures accumulate as independent diagnostics, while processing
 continues. The first error code becomes the process exit status.
+
+Check mode uses the same byte-producing pipeline, then compares against the
+source bytes before any call to persistence. It returns 0/1 for unchanged/changed
+and preserves actual errors separately while checking subsequent files. Output
+destinations and stdout redirection conflict with check mode; status messages use
+stderr so no INI output or misleading partial transformation is produced.

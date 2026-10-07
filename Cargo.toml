@@ -21,6 +21,12 @@ rust_decimal = { version = "1.43", default-features = false, features = ["std"] 
 
 [dev-dependencies]
 tempfile = "3"
+proptest = { version = "1.11", default-features = false, features = ["std"] }
+sha2 = "0.10"
+zip = { version = "6.0", default-features = false, features = ["deflate"] }
+
+[target.'cfg(windows)'.dev-dependencies]
+windows-sys = { version = "0.61", features = ["Win32_System_ProcessStatus", "Win32_System_Threading"] }
 
 [profile.release]
 lto = "thin"

@@ -21,6 +21,7 @@ pub struct Command {
     pub files: Vec<PathBuf>,
     pub out_file: Option<PathBuf>,
     pub stdout: bool,
+    pub check: bool,
     pub quiet: bool,
     pub pause: Pause,
     pub information: Option<Information>,
@@ -60,6 +61,12 @@ macro_rules! spec {
 // Keep environment application in the C# AppOptions declaration order. Combined
 // switches apply before their more specific section/entry counterparts.
 static SPECS: &[Spec] = &[
+    spec!(
+        Bool,
+        false,
+        ["check"],
+        "Check without writing: exit 0 if unchanged, 1 if changes are needed."
+    ),
     spec!(
         Help,
         false,
@@ -301,6 +308,9 @@ impl Command {
         for (spec, value) in actions {
             command.apply(spec, &value)?;
         }
+        if command.check && (command.stdout || command.out_file.is_some()) {
+            return Err("--check cannot be combined with --stdout or --out-file".into());
+        }
         Ok(command)
     }
 
@@ -323,6 +333,7 @@ impl Command {
         };
         let options = &mut self.options;
         match name {
+            "check" => self.check = boolean,
             "help" => {
                 self.information = Some(match value {
                     "examples" | "show-examples" => Information::Examples,

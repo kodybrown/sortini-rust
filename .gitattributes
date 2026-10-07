@@ -3,5 +3,6 @@
 *.md text eol=lf
 *.toml text eol=lf
 Cargo.lock text eol=lf diff
+*.proptest-regressions text eol=lf
 # Fixture CRLF is source data, not trailing whitespace to normalize.
 *.ini -text whitespace=cr-at-eol

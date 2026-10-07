@@ -6,6 +6,16 @@ The reference implementation, not only its help text, defines the behavior teste
 by the optional direct comparison suite. Four original input/expected fixture
 pairs are copied byte-for-byte into `tests/fixtures/`.
 
+The source is now archived. Ongoing comparisons use
+`C:\Users\kodyb\Bin\sortini_cs.exe`, version
+`4.0.2605.1521+d2259ec3a087e788bce9905063933ab9522f93e5`, SHA-256
+`0752682ea7e13b49c798df03e9aa7961fbbd5f33f5785e7a2c1fb87f519fd714`.
+This June binary predates the refreshed source: it expands formatting by default,
+adds BOMs for explicit `utf8`/`utf32`, misdetects Unicode CRLF, and crashes on
+redirected help. These observed differences do not change Rust's preservation
+defaults. The executable suite compares explicit formatting and pins the legacy
+BOM/EOL defects as distinct byte expectations.
+
 ## Supported options
 
 All names below accept `-`, `--`, and `/` prefixes and case-insensitive option
@@ -17,6 +27,7 @@ false (`-!sort`). False values on one-way switches such as `case-sensitive` or
 | --- | --- |
 | `o`, `out-file` | Output file; only one input permitted |
 | `stdout`, `redirect-to-stdout` | Text to stdout, leaving input unchanged |
+| `check` | Check exact output bytes without writing; 0 unchanged, 1 changes needed |
 | `sort` | Set both section and entry sorting; default true |
 | `sort-sections`, `sort-entries` | Set each sort independently; defaults true |
 | `sort-asc`, `sort-desc` | Ascending (default) or descending |
@@ -85,6 +96,7 @@ case and surrounding whitespace. Other values are rejected with a diagnostic.
    double quotes. Comment characters without that space are part of the value.
 5. Entry comparison uses key, then value. Natural sorting recognizes complete
    decimal numbers and trailing numeric suffixes, rather than every digit run.
+   Rust now derives prefix/number keys consistently; see the correction below.
 6. Despite its description, C# `ordinal` only disables natural numbers. It keeps
    invariant-culture text comparison. Rust preserves this behavior.
 7. Any expand/compact flag enables whole-document normalization. Line-only
@@ -100,9 +112,21 @@ case and surrounding whitespace. Other values are rejected with a diagnostic.
 
 ## Deliberate corrections and platform limits
 
+- Natural comparison no longer switches between numeric and full-text ordering
+  depending on the other label. That C# rule creates cycles such as
+  `-2 < -1 < -1a < -2`, invalid for Rust's sorting contract. Each label now gets a
+  `(text prefix, optional decimal)` key: complete numbers have an empty prefix,
+  suffix numbers retain their prefix, and other labels use their entire text.
+  Prefixes compare by root collation, then absent/present numbers and exact
+  decimal values. This changes some mixed-prefix orders: `item1.10` now precedes
+  `item-10`. `ordinal` retains full-text collation without numeric keys.
+
 - Raw blank-line whitespace, mixed EOLs, and missing final newline are preserved.
   C# removes blank-line whitespace, normalizes to the first EOL, and appends a
   final newline. Explicit Rust formatting still normalizes these.
+- If sorting places an LF blank line after a CR-ending entry, Rust widens that
+  boundary's CR to CRLF so the two endings cannot merge and erase the blank line.
+  Other physical EOLs remain unchanged, and a second sort is byte-identical.
 - Equal comparisons use stable sorting, preventing duplicate entry/section
   reordering from C#'s unstable `List.Sort`.
 - BOM-less Unicode decoding works for recognizable initial ASCII syntax.
@@ -127,9 +151,9 @@ case and surrounding whitespace. Other values are rejected with a diagnostic.
 
 | Code | Meaning |
 | --- | --- |
-| 0 | Success, including information commands and empty piped input |
-| 1 | No input file and stdin is a terminal |
-| 2 | Invalid or missing option/environment value |
+| 0 | Success; in check mode, every input is byte-identical to its configured output |
+| 1 | Check mode needs changes; ordinary mode has no input file and stdin is a terminal |
+| 2 | Invalid/missing option/environment value, conflicting check output options, or missing check input |
 | 10 | Read, decode, or input processing failure |
 | 13 | Write/output failure |
 | 99 | Multiple input files with `out-file` |
@@ -137,3 +161,14 @@ case and surrounding whitespace. Other values are rejected with a diagnostic.
 Rust uses a portable positive code 2 for parse failures rather than the C#
 binder's negative codes. Errors go to stderr. An INI-producing stdout stream
 never contains error text or pause prompts.
+
+## Check mode
+
+`--check` runs the same decode/sort/encode pipeline as file output and compares
+the exact bytes. Encoding, BOM, EOL, sorting and formatting options all count.
+It reads files or stdin, creates no output or backup, and prints per-input status
+to stderr. `--quiet` suppresses statuses but keeps errors. Multiple files are all
+checked; an actual processing failure overrides the changed status regardless of
+input order. `--stdout` and `--out-file` conflict with check mode and are rejected
+before input processing. `-!check` restores ordinary behavior. A positive check
+result does not trigger `-pause iferror`.

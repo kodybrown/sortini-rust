@@ -212,6 +212,13 @@ sorting_case!(
     "[s]\r\nz=2\na=1\r",
     "[s]\r\na=1\rz=2\n"
 );
+
+sorting_case!(
+    mixed_eol_blank_group_does_not_merge_newlines,
+    &[],
+    "[s]\na=1\rz=2\n\nb=2\n",
+    "[s]\na=1\r\n\nb=2\nz=2\n"
+);
 sorting_case!(
     eol_override,
     &["-eol", "\\r"],
@@ -365,4 +372,12 @@ fn sorting_is_idempotent() {
         let once = sort_text(source, &options);
         assert_eq!(sort_text(&once, &options), once);
     }
+}
+
+#[test]
+fn mixed_numeric_prefixes_have_a_pinned_transitive_order() {
+    let input = "[s]\nitem-2=v\nitem-10=v\nitem1.2=v\nitem1.10=v\n-1a=v\n-1=v\n-2=v\n";
+    let expected = "[s]\n-2=v\n-1=v\n-1a=v\nitem1.10=v\nitem1.2=v\nitem-10=v\nitem-2=v\n";
+    assert_eq!(sort_text(input, &Options::default()), expected);
+    assert_eq!(sort_text(expected, &Options::default()), expected);
 }

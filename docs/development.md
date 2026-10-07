@@ -1,62 +1,103 @@
 # Development
 
-Use Rust 1.95 or newer and Cargo with the `rustfmt` and `clippy` components.
-The project uses edition 2024. `Cargo.lock` is committed for repeatable executable
-builds. The reference C# project is only needed for optional differential tests.
-GitHub Actions runs the same gate on Windows, Linux, and macOS after pushes or
-pull requests; that workflow is configured but has not run for this local task.
+Use Rust 1.95 or newer and Cargo with `rustfmt` and `clippy`. The project uses
+edition 2024 and a committed `Cargo.lock`. Focus is Windows for now; CI runs on
+`windows-latest`. Build, test, benchmark, and packaging entry points are Cargo
+commands. Make is not used, and dotask is deferred until it stabilizes.
 
-## Full verification
+## Verification
 
-From the active task worktree:
+From the active checkout/worktree:
 
 ```powershell
-pwsh -NoProfile -File scripts/verify.ps1
-cargo run --locked -- --help
-```
-
-The same gate without PowerShell:
-
-```sh
 cargo fmt --all --check
 cargo clippy --locked --all-targets -- -D warnings
 cargo test --locked
 cargo test --locked --release
 cargo build --locked --release
 git diff --check
+git diff --cached --check
 ```
 
-Tests cover golden fixtures, natural decimal comparison, stable duplicates,
-comment attachment, disabled entries, raw/normalized output, Unicode/BOM/EOL
-matrices, parser aliases and prefixes, environment precedence, actual subprocess
-I/O, multiple errors, separate output, and backup recovery. On Windows, creating
-file symlinks can require Developer Mode or elevated privileges; the conditional
-test prints an explicit skip when that privilege is unavailable. Hard-link
-preservation is tested separately without that requirement.
+The property suites configure 1,536 generated encoding/byte-preservation/EOL/
+idempotence cases and 2,048 comparator cases with a reproducible seed and shrinking.
+Persisted regression seeds replay earlier failures. Separate
+regressions pin the legacy comparison-cycle correction. Process tests cover
+`--check`, readonly files, exact-byte comparisons, multiple-file error precedence,
+stdin, CLI prefixes/aliases, environment precedence, and ordinary file output.
 
-## Live C# comparison
+File-symlink creation may require Developer Mode or elevated privileges. The
+conditional symlink test explicitly reports a skip when Windows returns error
+1314; hard-link preservation is tested separately. Do not change machine security
+settings just to make that test pass.
 
-Build the C# reference with its own output policy, then obtain its evaluated
-assembly path. The test compares 200 stdout scenarios and 108 byte-level file
-outputs against the built C# app, totaling 308 comparisons. The suite intentionally
-uses well-formed files with uniform EOLs and final newlines to isolate compatible
-behavior from documented preservation corrections.
+Interactive acceptance in this task exercised `-pause always`, `-pause iferror`
+after a read failure, successful `-pause iferror`, and check-result behavior in a
+real terminal. Check status 1 does not trigger `iferror`; a missing terminal input
+in check mode returns 2. Piped input never waits for a pause.
+
+## C# executable comparison
+
+The source has been archived. Use the supplied executable directly:
 
 ```powershell
-$referenceProject = 'C:\Users\kodyb\Projects\sortini\sortini.csproj'
-dotnet build $referenceProject
-if ($LASTEXITCODE -ne 0) { throw 'C# build failed' }
-$env:SORTINI_CSHARP_DLL = (dotnet msbuild $referenceProject -getProperty:TargetPath).Trim()
-cargo test --locked --test parity -- --ignored --nocapture
-Remove-Item Env:SORTINI_CSHARP_DLL
+$env:SORTINI_CSHARP_EXE = 'C:\Users\kodyb\Bin\sortini_cs.exe'
+cargo test --locked --release --test parity -- --ignored --nocapture
+Remove-Item Env:SORTINI_CSHARP_EXE
 ```
 
-The normal Rust gate marks this single oracle test ignored, so a C# checkout is
-not required on contributors' machines. Changing sorting, parsing, or formatting
-should run it when the reference is available. The C# fixtures retain their
-original bytes, including BOM and line endings; do not autoformat them.
+The normal suite ignores this one machine-specific test. It pins the supplied
+June build's SHA-256 and checks 308 scenarios: 200 stdout cases plus 108 file-byte
+cases. Both apps receive explicit `--expand` before any scenario-specific flags,
+because this older build unexpectedly expands formatting by default. Numeric
+prefix families are compared independently; Rust's corrected mixed-prefix order
+has separate golden and comparator regressions.
 
-## Library use
+There are 260 exact matches and 48 explicitly asserted legacy difference cases.
+The difference cases include 36 BOM additions on `utf8`/`utf32` overrides and 20
+UTF-16/32 CRLF detection failures, with 8 overlapping cases. Both programs' file
+bytes are checked against independently constructed expectations; mismatches are
+not hidden by stripping BOMs or normalizing EOLs. See [parity](parity.md).
+
+## Benchmark
+
+```powershell
+cargo build --locked --release
+cargo run --locked --release --example benchmark -- --reference C:\Users\kodyb\Bin\sortini_cs.exe --report target\benchmark-windows.md
+```
+
+The example generates bounded deterministic INI files, validates the two apps'
+outputs, then alternates their execution for seven warmed samples per workload.
+Use `--iterations` for an odd count from 3 to 31, and `--rust` to select another
+release executable. Each sample has a 30-second limit. Timed stdout goes to NUL.
+Peak working-set counters are sampled through Win32, waiting on the process
+handle so short runs do not incur a polling-sleep tick after exit.
+
+[Recorded results](benchmark-windows.md) include executable hashes, input sizes,
+median wall times, end-to-end throughput, approximate process memory, and limits.
+These are synthetic local results and exclude write/backup/fsync costs. No
+performance optimization was introduced based solely on presumed speed.
+
+## Local Windows package
+
+```powershell
+cargo build --locked --release
+cargo run --locked --release --example package
+```
+
+The default output is
+`target/release/distribution/sortini-rust-4.0.0-windows-x86_64.zip` on this x64
+machine, with an adjacent `.zip.sha256` file. The ZIP contains `sortini_rust.exe`,
+`README.txt`, `LICENSE`, and `SHA256SUMS.txt`. Entries are read back and compared to
+their source bytes, and the restored executable is smoke-tested for version and
+nonmutating check behavior before success is reported. The utility refuses to overwrite
+an existing package; choose a new `--output-dir` to prepare another.
+
+Packaging does not copy into the user Bin folder, modify PATH, create a GitHub
+release, or publish anywhere. CI runs the same Cargo commands and prepares a
+Windows ZIP after a push; it has not been executed remotely during this task.
+
+## Library
 
 ```rust
 use sortini::{Options, sort_text};
@@ -66,13 +107,5 @@ assert_eq!(output, "[s]\na=1\nz=2\n");
 ```
 
 Use `sort_bytes` for encoding-aware callers. It returns a `Result` and preserves
-source encoding/BOM unless `Options::encoding` is supplied.
-
-## Manual acceptance
-
-- Run the release executable on representative personal INI copies, including
-  the option combinations you normally use.
-- Check `-pause always` and `-pause iferror` from an interactive terminal.
-- Run the symlink test on a machine permitted to create file symlinks.
-- Linux/macOS behavior is covered by portable code and tests but must be run on
-  those platforms before claiming local verification there.
+source encoding/BOM unless overridden. Library callers can implement their own
+check by comparing the returned bytes with the source bytes.

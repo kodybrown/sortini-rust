@@ -254,13 +254,23 @@ impl<'a> Document<'a> {
             }
         }
         let mut output = String::new();
-        let count = rendered.len();
-        for (i, (raw, ending)) in rendered.into_iter().enumerate() {
+        let mut lines = rendered.into_iter().peekable();
+        while let Some((raw, ending)) = lines.next() {
             output.push_str(&raw);
             // EOF is a document property: moving the original last line must not
             // concatenate two entries or introduce a final newline in raw mode.
-            if options.normalize || self.final_newline || i + 1 < count {
+            if options.normalize || self.final_newline || lines.peek().is_some() {
                 output.push_str(ending);
+                // Moving an LF blank line after a CR-ending entry can otherwise
+                // merge two physical endings into one CRLF and lose that blank.
+                // Widen just this boundary's CR to CRLF, leaving the blank's LF.
+                if ending == "\r"
+                    && lines.peek().is_some_and(|(next_raw, next_ending)| {
+                        next_raw.is_empty() && *next_ending == "\n"
+                    })
+                {
+                    output.push('\n');
+                }
             }
         }
         output

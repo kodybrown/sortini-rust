@@ -18,10 +18,12 @@ fn main() -> std::process::ExitCode {
         }
     };
     let code = run(&command);
-    if (command.pause == Pause::Always || (command.pause == Pause::IfError && code != 0))
+    if (command.pause == Pause::Always
+        || (command.pause == Pause::IfError && code != 0 && !(command.check && code == 1)))
         && io::stdin().is_terminal()
     {
         // Never wait on piped INI input or put prompts into sorted stdout.
+        // A positive check result means changes are needed, not a processing error.
         eprintln!("Press Enter to exit.");
         let _ = io::stdin().read_line(&mut String::new());
     }
@@ -46,21 +48,21 @@ fn run(command: &Command) -> u8 {
     if command.files.is_empty() {
         if io::stdin().is_terminal() {
             eprintln!("Missing file. Use --help, or pipe INI data via stdin.");
-            return 1;
+            return if command.check { 2 } else { 1 };
         }
         let mut bytes = Vec::new();
         if let Err(error) = io::stdin().read_to_end(&mut bytes) {
             eprintln!("Error reading stdin: {error}");
             return 10;
         }
-        return process(command, &bytes, command.out_file.as_deref(), true).unwrap_or_else(
-            |(code, error)| {
+        return process(command, &bytes, command.out_file.as_deref(), true, "stdin")
+            .unwrap_or_else(|(code, error)| {
                 eprintln!("Error processing stdin: {error}");
                 code
-            },
-        );
+            });
     }
     let mut first_error = 0;
+    let mut needs_changes = false;
     for path in &command.files {
         let result = fs::read(path)
             .map_err(|e| (10, e.to_string()))
@@ -70,16 +72,26 @@ fn run(command: &Command) -> u8 {
                     &bytes,
                     Some(command.out_file.as_deref().unwrap_or(path)),
                     false,
+                    &path.display().to_string(),
                 )
             });
-        if let Err((code, error)) = result {
-            if first_error == 0 {
-                first_error = code;
+        match result {
+            Ok(code) => needs_changes |= code == 1,
+            Err((code, error)) => {
+                if first_error == 0 {
+                    first_error = code;
+                }
+                eprintln!("Error processing '{}': {error}", path.display());
             }
-            eprintln!("Error processing '{}': {error}", path.display());
         }
     }
-    first_error
+    // A changed file is a successful check result, not a processing failure.
+    // Actual errors must win regardless of the order of input files.
+    if first_error != 0 {
+        first_error
+    } else {
+        u8::from(needs_changes)
+    }
 }
 
 fn process(
@@ -87,7 +99,21 @@ fn process(
     bytes: &[u8],
     destination: Option<&Path>,
     stdin: bool,
+    label: &str,
 ) -> Result<u8, (u8, String)> {
+    if command.check {
+        // Compare the exact bytes that file output would produce, including BOM,
+        // encoding and EOL overrides. This branch never enters persistence.
+        let output = sort_bytes(bytes, &command.options).map_err(|e| (10, e.to_string()))?;
+        let changed = output != bytes;
+        if !command.quiet {
+            eprintln!(
+                "{}: {label}",
+                if changed { "Would change" } else { "Unchanged" }
+            );
+        }
+        return Ok(u8::from(changed));
+    }
     if command.stdout || (stdin && destination.is_none()) {
         let source = EncodedText::decode(bytes).map_err(|e| (10, e.to_string()))?;
         let output = sort_text(&source.text, &command.options);

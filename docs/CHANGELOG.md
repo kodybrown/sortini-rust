@@ -2,6 +2,39 @@
 
 ## Unreleased
 
+### 2026-10-07 - Check mode, reliability, and Windows tooling
+
+- Added `--check` with exact byte comparison, nonmutating file/stdin processing,
+  quiet status reporting, encoding/EOL/format overrides, and processing-error
+  precedence across multiple inputs. Exit 0 means unchanged and 1 means changes
+  are needed. Conflicting output options fail before I/O.
+- Added generated tests for Unicode round trips, no-sort byte identity, arbitrary
+  decoding, raw-line retention, normalization/idempotence, mixed EOLs, and
+  comparator consistency, with a persisted failure seed and focused regressions.
+- Fixed nontransitive natural comparison by assigning consistent prefix/decimal
+  keys; documented intentional mixed-prefix ordering changes.
+- Fixed a mixed-EOL sorting boundary that could merge CR and an LF blank line
+  into one CRLF and remove that physical blank line.
+- Switched the comparison oracle to the supplied Windows `sortini_cs.exe` and
+  pinned its hash plus the older build's BOM/EOL differences. The archived C#
+  source is no longer needed for comparisons.
+- Added Cargo-run Windows benchmark and ZIP utilities. Benchmarks validate output
+  before timing, alternate warmed samples, record executable hashes and sampled
+  memory, and bound each sample. Packages include `sortini_rust.exe`, checksums,
+  and license/readme; entries are read back and the restored executable is tested.
+- Changed CI to Windows-only direct Cargo commands and removed the PowerShell
+  build gate. Make is not used; dotask remains deferred.
+- Verification: Cargo formatting, Clippy with warnings denied, Debug/Release
+  tests and release builds passed. All 308 C# scenarios were checked: 260 exact
+  matches and 48 explicitly asserted legacy difference cases. Windows package
+  read-back and executable smoke tests passed; warmed benchmarks are recorded in
+  `docs/benchmark-windows.md`.
+- Real-terminal pause checks passed, including successful and failed `iferror`
+  paths and check-mode status behavior. File-symlink creation still requires a
+  Windows privilege unavailable in this session; that conditional body was skipped.
+
+### Initial Rust implementation
+
 ### Added
 
 - Rust edition 2024 `sortini` binary and reusable library, implementing C#

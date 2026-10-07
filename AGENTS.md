@@ -10,8 +10,9 @@
 - Keep follow-up work in the same task worktree. Commit only scoped, verified
   work. Integrate and clean up only after explicit acceptance; never push
   without an explicit request.
-- Preserve the C# reference checkout at `C:\Users\kodyb\Projects\sortini`.
-  Do not change its implementation or fixtures as part of Rust work.
+- The C# source is archived. Use the supplied reference executable
+  `C:\Users\kodyb\Bin\sortini_cs.exe` for comparisons and benchmarks; do not
+  modify or replace it. Preserve the copied golden fixtures.
 - Changelog: `docs/CHANGELOG.md`; update it for every completed task.
 
 ## Implementation
@@ -28,20 +29,28 @@
 - Keep intent and constraint comments accurate across changes.
 - Do not rename over symlink destinations. Do not truncate input until
   decoding, sorting, and output encoding succeed.
+- `--check` never writes files or backups. Exit 0 means unchanged, 1 means changes
+  are needed, and actual processing errors take precedence across multiple files.
+- Natural comparison must define consistent keys for all labels. Never restore
+  the legacy pair-dependent numeric/lexical fallback, which creates order cycles.
+- Focus development and verification on Windows for now.
+- Use Cargo directly. Do not add Make/Makefiles or dotask; dotask is deferred
+  until explicitly requested after it stabilizes.
 
 ## Verification
 
-- Full gate: `pwsh -NoProfile -File scripts/verify.ps1`.
-- Portable commands: `cargo fmt --all --check`,
+- Full gate: `cargo fmt --all --check`,
   `cargo clippy --locked --all-targets -- -D warnings`,
   `cargo test --locked`, `cargo test --locked --release`,
   `cargo build --locked --release`, and `git diff --check`.
 - Run parser/CLI/I/O tests for behavioral changes. For parity-sensitive changes,
-  also run the optional C# comparison when the reference build is available;
+  also run the optional C# comparison against the supplied executable;
   see `docs/development.md`.
 - Report conditional symlink-test skips. Do not claim an interactive pause,
   unsupported platform, deployment, or installation was verified by unit tests.
-- Rust artifacts use Cargo's ignored `target/` or `CARGO_TARGET_DIR`. Any .NET
-  reference builds must retain the user's authoritative MSBuild output policy.
+- Rust artifacts use Cargo's ignored `target/` or `CARGO_TARGET_DIR`.
+- Benchmark and package via `cargo run --release --example benchmark` and
+  `cargo run --release --example package`; see `docs/development.md`. Package
+  preparation is local only and does not install, publish, or modify PATH.
 - Handoff must include exact `cd`, verification, and run commands for the task
   worktree, with committed versus integrated/pushed state made explicit.

@@ -31,19 +31,25 @@ impl Comparison {
     }
 
     pub fn compare(&self, a: &str, b: &str) -> Ordering {
-        let lexical = self.collator.compare(a, b);
-        if !self.natural || lexical == Ordering::Equal {
-            return lexical;
+        if !self.natural {
+            return self.collator.compare(a, b);
         }
-        if let (Some(a), Some(b)) = (number(a), number(b)) {
-            return a.cmp(&b);
-        }
-        if let (Some((ap, an)), Some((bp, bn))) = (suffix(a), suffix(b))
-            && self.collator.compare(ap, bp) == Ordering::Equal
-        {
-            return an.cmp(&bn);
-        }
-        lexical
+        // Pair-dependent fallback to whole-string collation creates cycles:
+        // -2 < -1 numerically, but -1 < -1a < -2 lexically. Every label must
+        // receive the same key regardless of its comparison partner.
+        let (ap, an) = natural_key(a);
+        let (bp, bn) = natural_key(b);
+        self.collator.compare(ap, bp).then_with(|| an.cmp(&bn))
+    }
+}
+
+fn natural_key(text: &str) -> (&str, Option<Decimal>) {
+    if let Some(value) = number(text) {
+        ("", Some(value))
+    } else if let Some((prefix, value)) = suffix(text) {
+        (prefix, Some(value))
+    } else {
+        (text, None)
     }
 }
 
@@ -83,4 +89,54 @@ fn suffix(text: &str) -> Option<(&str, Decimal)> {
         value = -value;
     }
     Some((prefix, value))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::{prelude::*, test_runner::RngSeed};
+
+    fn label() -> impl Strategy<Value = String> {
+        prop_oneof![
+            "[a-zA-Z0-9éΩ._+-]{0,12}",
+            "[a-zA-ZéΩ._+-]{0,5}[0-9]{0,4}",
+            (-10000i32..10000).prop_map(|n| n.to_string()),
+            (-10000i32..10000, 0u32..1000).prop_map(|(n, f)| format!("{n}.{f}")),
+        ]
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig { cases: 1024, rng_seed: RngSeed::Fixed(0x5074696e69), ..ProptestConfig::default() })]
+
+        #[test]
+        fn comparison_is_reflexive_and_antisymmetric(a in label(), b in label(), ignore_case in any::<bool>(), natural in any::<bool>()) {
+            let comparison = Comparison::new(ignore_case, natural);
+            prop_assert_eq!(comparison.compare(&a, &a), Ordering::Equal);
+            prop_assert_eq!(comparison.compare(&a, &b), comparison.compare(&b, &a).reverse());
+        }
+
+        #[test]
+        fn comparison_is_transitive(a in label(), b in label(), c in label(), ignore_case in any::<bool>(), natural in any::<bool>()) {
+            let comparison = Comparison::new(ignore_case, natural);
+            let ab = comparison.compare(&a, &b);
+            let bc = comparison.compare(&b, &c);
+            if ab != Ordering::Greater && bc != Ordering::Greater {
+                prop_assert_ne!(comparison.compare(&a, &c), Ordering::Greater, "a={:?}, b={:?}, c={:?}", a, b, c);
+            }
+        }
+    }
+
+    #[test]
+    fn numeric_and_text_labels_have_a_consistent_order() {
+        let comparison = Comparison::new(true, true);
+        for labels in [["-2", "-1", "-1a"], ["item2", "item10", "item1x"]] {
+            let [a, b, c] = labels;
+            assert!(
+                !(comparison.compare(a, b).is_lt()
+                    && comparison.compare(b, c).is_lt()
+                    && comparison.compare(c, a).is_lt()),
+                "comparison cycle: {labels:?}"
+            );
+        }
+    }
 }

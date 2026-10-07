@@ -23,16 +23,18 @@ cargo run --locked -- -expand -sort-desc settings.ini
 Get-Content settings.ini -Raw | cargo run --locked -- -!sort-sections
 ```
 
-The release executable is `target/release/sortini.exe` on Windows and
-`target/release/sortini` on Linux/macOS. Cargo's standard `target/` directory is
+Development and verification currently focus on Windows. The release executable
+is `target/release/sortini.exe`. Cargo's standard `target/` directory is
 ignored; `CARGO_TARGET_DIR` is supported if you prefer external Rust artifacts.
 PowerShell's text pipelines may transcode input before sortini receives it; use
 file arguments when exact source bytes matter.
 
-Install into Cargo's user binary directory when desired:
+Prepare a Windows ZIP with a distinct `sortini_rust.exe` name to coexist with
+`sortini_cs.exe`:
 
 ```powershell
-cargo install --path . --locked
+cargo build --release --locked
+cargo run --release --locked --example package
 ```
 
 ## Examples
@@ -43,6 +45,7 @@ sortini one.ini two.ini                    # process multiple files
 sortini settings.ini -stdout               # print without changing the file
 sortini settings.ini -o sorted.ini         # write a separate file
 sortini settings.ini /sort-desc /!natural  # slash flags and boolean negation
+sortini settings.ini --check               # 0 unchanged, 1 changes needed; no writes
 sortini settings.ini -!sort-sections        # sort entries only
 sortini settings.ini -!sort-entries         # sort sections only
 sortini settings.ini -case-sensitive       # case-sensitive comparison
@@ -58,14 +61,21 @@ matching the C# output behavior.
 ## Verification and design
 
 ```powershell
-./scripts/verify.ps1
+cargo fmt --all --check
+cargo clippy --locked --all-targets -- -D warnings
+cargo test --locked
+cargo test --locked --release
+cargo build --locked --release
 ```
 
-The gate checks Rust formatting, Clippy warnings, Debug/Release tests and build,
-and Git whitespace. The optional C# oracle test is documented separately.
+These commands check Rust formatting, Clippy warnings, Debug/Release tests, and
+the release build. Use `git diff --check` for whitespace. Builds use Cargo
+directly; Make and dotask are not used. The optional C# executable comparison is
+documented separately.
 
 - [Development and verification](docs/development.md)
 - [CLI behavior and parity decisions](docs/parity.md)
 - [Architecture](docs/design.md)
+- [Windows benchmark results](docs/benchmark-windows.md)
 - [Changelog](docs/CHANGELOG.md)
 - [MIT license](LICENSE)
